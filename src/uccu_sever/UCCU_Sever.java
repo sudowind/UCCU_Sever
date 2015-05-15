@@ -5,25 +5,36 @@
  */
 package uccu_sever;
 
+import java.net.InetAddress;
+
 /**
  *
  * @author Xiaoshuang
  */
 public class UCCU_Sever {
-
+    
     /**
      * @param args the command line arguments
      */
+    
+    static String ip;
+    
+    
     public static void main(String[] args) {
         // TODO code application logic here
-        AioModule aio = new AioModule(new SampleRegister(), new SampleDecoder());
-        aio.init("162.105.37.89", 8998, 4);
-        aio.asyncAccept();
+        GateServer gate = new GateServer();
+        AioModule aio = new AioModule(gate, gate);
         try {
-            Thread.sleep(1000000);
+            ip = InetAddress.getLocalHost().getHostAddress();
+        } catch (Exception e) {
         }
-        catch (Exception e) {
-        }
+        aio.init(ip, 8438, 4);
+        String gip = new String();////////////////////////////////
+        String lip = new String();
+        int gport = 0; 
+        int lport = 0;
+        gate.init(gip, gport, lip, lport, aio);
+        aio.asyncAccept();
     }
     
 }
