@@ -39,7 +39,8 @@ public class AioSession {
     private Decoder decoder;
     private CompletionHandler<Integer, AioSession> readCompletionHandler;
     private CompletionHandler<Integer, AioSession> writeCompletionHandler;
-
+    private Object attachment;
+    
     public AioSession(AsynchronousSocketChannel sockChannel, Decoder dec, CompletionHandler readHandler, 
                         CompletionHandler writeHandler) {
         readBuffer = ByteBuffer.allocate(128);
@@ -48,6 +49,14 @@ public class AioSession {
         writeCompletionHandler = writeHandler;
         decoder = dec;
         writeQueue = new LinkedList<ByteBuffer>();
+    }
+    public void setAttachment(Object att)
+    {
+        attachment = att;
+    }
+    public Object getAttachment()
+    {
+        return attachment;
     }
     public ByteBuffer getReadBuffer()
     {

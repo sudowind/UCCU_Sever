@@ -9,6 +9,9 @@ package uccu_sever;
  *
  * @author Xiaoshuang
  */
+
+import java.net.InetAddress;
+
 public class UCCU_Sever {
 
     /**
@@ -17,9 +20,9 @@ public class UCCU_Sever {
     public static void main(String[] args) {
         // TODO code application logic here
         AioModule aio = new AioModule(new SampleRegister(), new SampleDecoder());
-        aio.init("162.105.37.89", 8998, 4);
-        aio.asyncAccept();
         try {
+            aio.init(InetAddress.getLocalHost().getHostAddress(), 8998, 4);
+            aio.asyncAccept();
             Thread.sleep(1000000);
         }
         catch (Exception e) {
