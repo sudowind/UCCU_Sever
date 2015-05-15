@@ -6,22 +6,25 @@
 package uccu_sever;
 
 import java.nio.ByteBuffer;
+import org.w3c.dom.ls.LSException;
 
 /**
  *
- * @author Wind
+ * @author Xiaoshuang
  */
 enum Target
 {
-    Gate, 
-    DB
+    GS, 
+    LS,
+    CT
 }
 
 public class Datagram
 {
     static char head = 0xFFFF;
-    static byte toGate = 0x01;
-    static byte toDB = 0x03;
+    static byte toGS = 0x01;
+    static byte toLS = 0x03;
+    static byte toClient = 0x00;
     public static ByteBuffer wrap(ByteBuffer msg, Target tar, int sn)
     {
         int len = 10 + msg.remaining();
@@ -31,10 +34,12 @@ public class Datagram
         
         res.putChar(head);
         res.putInt(len);
-        if(tar == Target.Gate)
-            res.put(toGate);
-        else if(tar == Target.DB)
-            res.put(toDB);
+        if(tar == Target.GS)
+            res.put(toGS);
+        else if(tar == Target.LS)
+            res.put(toLS);
+        else if(tar == Target.CT)
+            res.put(toClient);
         res.put(SN);
         res.put(msg);
         char checksum = getChecksum(res.array(),res.position());
@@ -46,13 +51,17 @@ public class Datagram
     
     public static ByteBuffer getDatagram(ByteBuffer buffer)
     {
-        if(buffer.remaining()<8)//包头+校验码不足
+        if(buffer.remaining()<8){//包头+校验码不足
+            buffer.compact();
             return null;
+        }
         
         int len = buffer.getInt(2);
-        if(buffer.remaining()<len)//包长不足
+        if(buffer.remaining()<len){//包长不足
+            buffer.compact();
             return null;
-        
+        }
+            
         ByteBuffer tmp = ByteBuffer.allocate(len);
         while(tmp.hasRemaining())
             tmp.put(buffer.get());
