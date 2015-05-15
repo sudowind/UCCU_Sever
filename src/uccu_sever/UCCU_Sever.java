@@ -9,7 +9,7 @@ import java.net.InetAddress;
 
 /**
  *
- * @author Xiaoshuang
+ * @author Wind
  */
 public class UCCU_Sever {
     
