@@ -64,7 +64,11 @@ public class AioModule {
             asyncServerSocketChannel.setOption(StandardSocketOptions.SO_REUSEADDR, true);
             asyncServerSocketChannel.setOption(StandardSocketOptions.SO_RCVBUF, 16 * 1024);
             if(port >= 0)
+            {
                 asyncServerSocketChannel.bind(new InetSocketAddress(hostName, port), 100);
+                System.out.println("Start listening at " + hostName + ": " + port);
+            }
+                
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -93,8 +97,11 @@ public class AioModule {
     }
     public void addSession(AioSession session)
     {
-        if(!sessionsMap.containsKey(session.getRemoteSocketAddress()))
-            sessionsMap.put(session.getRemoteSocketAddress(), session);
+        synchronized(sessionsMap)
+        {
+            if(!sessionsMap.containsKey(session.getRemoteSocketAddress()))
+                sessionsMap.put(session.getRemoteSocketAddress(), session);
+        }
     }
     private final class AcceptCompletionHandler implements CompletionHandler<AsynchronousSocketChannel, AioModule>
     {
@@ -104,6 +111,7 @@ public class AioModule {
         }
         public void completed(AsynchronousSocketChannel socketChannel, AioModule aio)
         {
+            aio.started = false;
             try {
                 System.out.println("Accept from "+ socketChannel.getRemoteAddress());
                 socketChannel.setOption(StandardSocketOptions.TCP_NODELAY, true);
@@ -129,6 +137,7 @@ public class AioModule {
         }
         public void failed(Throwable exc, AioModule aio)
         {
+           aio.started = false;
            exc.printStackTrace();
            asyncAccept();
         }
@@ -177,6 +186,7 @@ public class AioModule {
         }
         public void failed(Throwable exc, AioSession session)
         {
+            System.out.println("Read Failed!");
             exc.printStackTrace();
             session.close();
         }
