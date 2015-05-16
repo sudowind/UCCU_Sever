@@ -10,6 +10,7 @@ import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.sql.DriverManager;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.TreeSet;
 import oracle.jrockit.jfr.events.ContentTypeImpl;
 import org.w3c.dom.ls.LSException;
@@ -19,26 +20,48 @@ import org.w3c.dom.ls.LSException;
  * @author Wind
  */
 
-class playerInfo{
+class PlayerInfo{
     private int id;
+    private int sessionID;
     private String name;
     private byte level;
     private byte gender;
     private int posX;
     private int posY;
 
-    public playerInfo(int i, String nm, byte lv, byte gd, int x, int y) {
+    public PlayerInfo(int i, String nm, byte lv, byte gd, int x, int y, int session) {
         id = i;
         name = nm;
         level = lv;
         gender = gd;
         posX = x;
         posY = y;
+        sessionID = session;
     }
     
     public void changePos(int x, int y){
         posX = x;
         posY = y;
+    }
+    
+    public int getPlayerID(){
+        return id;
+    }
+    
+    public int getSession(){
+        return sessionID;
+    }
+    
+    public ByteBuffer pack(){
+        ByteBuffer tmp = ByteBuffer.allocate(128);
+        tmp.putInt(id);
+        Datagram.restoreString(tmp, name);
+        tmp.put(level);
+        tmp.put(gender);
+        tmp.putInt(posX);
+        tmp.putInt(posY);
+        tmp.flip();
+        return tmp;
     }
 }
 
@@ -48,7 +71,7 @@ public class GateServer implements Register, Decoder{
     private AioSession loginSession;
     //in the following two lines, Integer represents sessionID
     private HashMap<Integer, AioSession> sessions = new HashMap<Integer, AioSession>();
-    private HashMap<Integer, playerInfo> players = new HashMap<Integer, playerInfo>();
+    private HashMap<Integer, PlayerInfo> players = new HashMap<Integer, PlayerInfo>();
     private int clientNum = 0;
     private ByteBuffer tmpBuffer;
     static char head = 0xffff;
@@ -79,38 +102,6 @@ public class GateServer implements Register, Decoder{
         clientNum++;
         aio.addSession(session);
         return true;
-    }
-    
-    public static char getChecksum(byte[] content, int length){
-        char sum = 0;
-        char seed = 49877; //Prime number
-        for(int i = 0; i < length; ++i){
-            sum = (char)((sum * (i + 1) + content[i]) % seed);
-        }
-        return sum;
-    }
-    
-    public static ByteBuffer wrap(ByteBuffer msg, Target tar, int sn)
-    {
-        int len = 8+msg.remaining();
-        ByteBuffer res = ByteBuffer.allocate(len+8);
-        
-        byte SN = (byte)sn;
-        
-        res.putChar(head);//head
-        res.putInt(len);//length
-        if(tar == Target.GS)//
-            res.put(toGS);
-        else if(tar == Target.LS)
-            res.put(toLS);
-        else if(tar == Target.CT)
-            res.put(toClient);
-        res.put(SN);
-        res.put(msg);
-        char checksum = getChecksum(res.array(),res.position());
-        res.putChar(checksum);
-        res.flip();
-        return res;
     }
     
     //client and GateServer
@@ -156,15 +147,23 @@ public class GateServer implements Register, Decoder{
                 nbuf.flip();
                 session.write(Datagram.wrap(nbuf, Target.LS, 0x08));//0x0208
                 break;
-            case 0x000b:
+            case 0x000b://try to move
                 nbuf.put((byte)session.getAttachment());
                 nbuf.put(tmp);
                 nbuf.flip();
                 session.write(Datagram.wrap(nbuf, Target.GS, 0x0b));//0x010b
                 break;
-            case 0x000d:
+            case 0x000d://Globle message
+                nbuf.put((byte)session.getAttachment());
+                nbuf.put(tmp);
+                nbuf.flip();
+                session.write(Datagram.wrap(nbuf, Target.GS, 0x0d));//0x010d
                 break;
             case 0x0010:
+                nbuf.put((byte)session.getAttachment());
+                nbuf.put(tmp);
+                nbuf.flip();
+                session.write(Datagram.wrap(nbuf, Target.GS, 0x10));//0x0110
                 break;
         }
     }
@@ -172,7 +171,16 @@ public class GateServer implements Register, Decoder{
     //GameServer and GateServer
     private class GameDecoder implements Decoder{
         public void decode(ByteBuffer buffer, AioSession session){
+            int sessionID;
             char form;
+            int id;
+            String name;
+            byte level;
+            byte gender;
+            int posX;
+            int posY;
+            String msg;
+            PlayerInfo player;
             ByteBuffer tmp = Datagram.getDatagram(buffer);
             ByteBuffer nbuf = ByteBuffer.allocate(64);
             if(tmp == null)
@@ -183,24 +191,80 @@ public class GateServer implements Register, Decoder{
                     loginSession = localAio.connect(lIp, lPort, new LoginDecoder());
                     maxChar = tmp.getInt(2);
                     tmp.limit(2);
-                    loginSession.write(wrap(tmp, Target.LS, 0x00));//0x0200
+                    loginSession.write(Datagram.wrap(tmp, Target.LS, 0x00));//0x0200
                     break;
                 case 0x010a:
-                    int sessionID = tmp.getInt();
-                    int id = tmp.getInt();
-                    
-                    String name;
+                    sessionID = tmp.getInt();
+                    tmp.compact();
+                    id = tmp.getInt();
+                    name = Datagram.extractString(tmp);
+                    level = tmp.get();
+                    gender = tmp.get();
+                    posX = tmp.getInt();
+                    posY = tmp.getInt();
+                    tmp.rewind();
+                    synchronized(players){
+                        players.put(sessionID, new PlayerInfo(id, name, level, 
+                                gender, posX, posY, sessionID));
+                        for(Map.Entry<Integer, PlayerInfo>  entry: players.entrySet()){////////////////////chu le wen ti xian kan zhe li
+                            player = entry.getValue();
+                            sessions.get(player.getSession()).write(Datagram.wrap(tmp, Target.CT, 0x0a));//0x000a
+                            sessions.get(sessionID).write(Datagram.wrap(player.pack(), Target.CT, 0x0a));//0x000a
+                        }
+                    }
                     break;
-                case 0x010c:
-                    
+                case 0x010c://allow this movement
+                    sessionID = tmp.getInt();
+                    tmp.compact();
+                    id = tmp.getInt();
+                    posX = tmp.getInt();
+                    posY = tmp.getInt();
+                    nbuf.putInt(id);
+                    nbuf.putInt(posX);
+                    nbuf.putInt(posY);
+                    synchronized(players){
+                        players.get(sessionID).changePos(posX, posY);
+                        for(Map.Entry<Integer, PlayerInfo> entry: players.entrySet()){
+                            sessions.get(entry.getValue().getSession()).write(
+                                    Datagram.wrap(nbuf, Target.CT, 0x0c));//0x000c
+                        }
+                    }
                     break;
-                case 0x010e:
+                case 0x010e://Globel msg rejected
+                    sessionID = tmp.getInt();
+                    tmp.compact();
+                    sessions.get(sessionID).write(Datagram.wrap(tmp, Target.CT, 0x0e));//0x000e
                     break;
-                case 0x010f:
+                case 0x010f://send globel msg to every player
+                    sessionID = tmp.getInt();
+                    tmp.compact();
+                    synchronized(players){
+                        for(Map.Entry<Integer, PlayerInfo> entry: players.entrySet()){
+                            sessions.get(entry.getValue().getSession()).write(
+                                    Datagram.wrap(tmp, Target.CT, 0x0f));//0x000f
+                        }
+                    }
                     break;
-                case 0x0111:
+                case 0x0111://Private chat rejected
+                    sessionID = tmp.getInt();
+                    tmp.compact();
+                    sessions.get(sessionID).write(Datagram.wrap(tmp, Target.CT, 0x11));//0x0011
                     break;
-                case 0x0112:
+                case 0x0112://Private chat
+                    sessionID = tmp.getInt();
+                    tmp.compact();
+                    id = tmp.getInt(4);
+                    sessions.get(sessionID).write(Datagram.wrap(tmp, Target.CT, 0x11));//0x0011
+                    synchronized(players){
+                        for(Map.Entry<Integer, PlayerInfo> entry: players.entrySet()){
+                            player = entry.getValue();
+                            if(player.getPlayerID() == id){
+                                sessions.get(player.getSession()).write(
+                                        Datagram.wrap(tmp, Target.CT, 0x0f));//0x000f
+                                break;
+                            }
+                        }
+                    }
                     break;
             }
         }
