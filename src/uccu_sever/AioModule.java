@@ -81,7 +81,7 @@ public class AioModule {
             if(port >= 0)
             {
                 asyncServerSocketChannel.bind(new InetSocketAddress(hostName, port), 100);
-                System.out.println("Start listening at " + hostName + ": " + port);
+                System.out.println("Bind at " + hostName + ": " + port);
             }
                 
         } catch (Exception e) {
@@ -106,6 +106,7 @@ public class AioModule {
     {
         if(!this.started && this.asyncServerSocketChannel.isOpen())
         {
+            System.out.println("Start listening!");
             asyncServerSocketChannel.accept(this, new AcceptCompletionHandler());
             this.started = true;
         }
@@ -178,18 +179,18 @@ public class AioModule {
             try {
                 
                 session.getReadBuffer().flip();
-                session.decode();
-                session.getReadBuffer().rewind();
+                
+                
                 while(session.getReadBuffer().hasRemaining())
                 {
                     System.out.print(session.getReadBuffer().get() + " ");
                 }
                 System.out.println("");
                 
-//                ByteBuffer msg = ByteBuffer.allocate(64);
-//                msg.put((8+"Hello!\n").getBytes());
-//                msg.flip();
-//                session.write(msg);
+                session.getReadBuffer().rewind();
+                
+                session.decode();
+
                 session.getReadBuffer().compact();
             } catch (Exception e) {
                 e.printStackTrace();

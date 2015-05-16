@@ -24,6 +24,7 @@ public class UCCU_Sever {
     public static void main(String[] args) {
         // TODO code application logic here
         GateServer gate = new GateServer();
+        Shell sh = new Shell();
         AioModule aio = new AioModule(gate, gate, gate);
         try {
             ip = InetAddress.getLocalHost().getHostAddress();
@@ -31,9 +32,10 @@ public class UCCU_Sever {
         }
         aio.init(ip, 8438, 4);
         //get ips and ports
+        /*
         Scanner in = new Scanner(System.in);
         System.out.println("Please type in GameServer's ip and port number");
-        String gip = in.next();////////////////////////////////
+        String gip = in.next();
         int gport = in.nextInt();
         System.out.println("Please type in LoginServer's ip and port number");
         in = new Scanner(System.in);
@@ -41,8 +43,11 @@ public class UCCU_Sever {
         int lport = in.nextInt();
         System.out.println("GameServer is " + gip + ":" + gport);
         System.out.println("LoginServer is " + lip + ":" + lport);
-        gate.init(gip, gport, lip, lport, aio);
-        aio.asyncAccept();
+       
+        //aio.asyncAccept();
+                */
+        gate.init("162.105.37.202", 8998, "162.105.37.202", 8798, aio);
+        sh.startShell();
     }
     
 }

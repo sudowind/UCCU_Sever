@@ -26,7 +26,7 @@ class Datagram
 {
     static char head = 0xFFFF;
     static byte toGS = 0x01;
-    static byte toLS = 0x03;
+    static byte toLS = 0x02;
     static byte toClient = 0x00;
     static Charset charset = Charset.forName("GBK");
     
@@ -61,7 +61,6 @@ class Datagram
     {
         if(buffer.remaining()<8)//包头+校验码不足
         {
-            buffer.compact();
             return null;
         }
             
@@ -69,7 +68,6 @@ class Datagram
         int len = buffer.getInt(2);
         if(buffer.remaining()<len)//包长不足
         {
-            buffer.compact();
             return null;
         }
         
@@ -77,7 +75,6 @@ class Datagram
         while(tmp.hasRemaining())
             tmp.put(buffer.get());
         
-        buffer.compact();
         tmp.flip();
         if(checked(tmp))
             return tmp;
