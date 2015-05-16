@@ -20,12 +20,12 @@ import org.w3c.dom.ls.LSException;
  */
 
 class playerInfo{
-    int id;
-    String name;
-    byte level;
-    byte gender;
-    int posX;
-    int posY;
+    private int id;
+    private String name;
+    private byte level;
+    private byte gender;
+    private int posX;
+    private int posY;
 
     public playerInfo(int i, String nm, byte lv, byte gd, int x, int y) {
         id = i;
@@ -35,12 +35,18 @@ class playerInfo{
         posX = x;
         posY = y;
     }
+    
+    public void changePos(int x, int y){
+        posX = x;
+        posY = y;
+    }
 }
 
 public class GateServer implements Register, Decoder{
     private AioModule localAio;
     private AioSession gameSession;
     private AioSession loginSession;
+    //in the following two lines, Integer represents sessionID
     private HashMap<Integer, AioSession> sessions = new HashMap<Integer, AioSession>();
     private HashMap<Integer, playerInfo> players = new HashMap<Integer, playerInfo>();
     private int clientNum = 0;
@@ -107,32 +113,54 @@ public class GateServer implements Register, Decoder{
         return res;
     }
     
+    //client and GateServer
     public void decode(ByteBuffer buffer, AioSession session){
         int id = (int)session.getAttachment();
         
         char form;
-        char checkCode;
         ByteBuffer tmp = Datagram.getDatagram(buffer);
         ByteBuffer nbuf = ByteBuffer.allocate(64);
         if(tmp == null)
             return;
         form = Datagram.trim(tmp);
         switch(form){
-            case 0x0000:
-                nbuf.put((byte)0);
+            case 0x0000://first attach
+                int hello = 12345;
+                nbuf.put((byte)hello);
                 nbuf.flip();
-                session.write(Datagram.wrap(nbuf, Target.CT, 0x01));
+                session.write(Datagram.wrap(nbuf, Target.GS, 0x00));//0x0100
                 break;
-            case 0x0002:
-                
+            case 0x0002://login info
+                nbuf.put((byte)session.getAttachment());
+                nbuf.put(tmp);
+                nbuf.flip();
+                session.write(Datagram.wrap(nbuf, Target.LS, 0x02));//0x0202
                 break;
-            case 0x0004:
+            case 0x0004://register new player
+                nbuf.put((byte)session.getAttachment());
+                nbuf.put(tmp);
+                nbuf.flip();
+                session.write(Datagram.wrap(nbuf, Target.LS, 0x04));//0x0204
                 break;
-            case 0x0007:
+            case 0x0007://res of character chosen
+                nbuf.put((byte)session.getAttachment());
+                nbuf.put(tmp);
+                nbuf.flip();
+                ByteBuffer tbuf = nbuf.duplicate();
+                session.write(Datagram.wrap(nbuf, Target.LS, 0x07));//0x0207
+                session.write(Datagram.wrap(tbuf, Target.GS, 0x09));//0x0109
                 break;
             case 0x0008:
+                nbuf.put((byte)session.getAttachment());
+                nbuf.put(tmp);
+                nbuf.flip();
+                session.write(Datagram.wrap(nbuf, Target.LS, 0x08));//0x0208
                 break;
             case 0x000b:
+                nbuf.put((byte)session.getAttachment());
+                nbuf.put(tmp);
+                nbuf.flip();
+                session.write(Datagram.wrap(nbuf, Target.GS, 0x0b));//0x010b
                 break;
             case 0x000d:
                 break;
@@ -141,25 +169,30 @@ public class GateServer implements Register, Decoder{
         }
     }
     
+    //GameServer and GateServer
     private class GameDecoder implements Decoder{
         public void decode(ByteBuffer buffer, AioSession session){
             char form;
-            char checkCode;
             ByteBuffer tmp = Datagram.getDatagram(buffer);
             ByteBuffer nbuf = ByteBuffer.allocate(64);
             if(tmp == null)
                 return;
             form = Datagram.trim(tmp);
             switch(form){
-                case 0x0101:
+                case 0x0101://connect LoginServer
                     loginSession = localAio.connect(lIp, lPort, new LoginDecoder());
                     maxChar = tmp.getInt(2);
                     tmp.limit(2);
-                    loginSession.write(wrap(tmp, Target.LS, 0x00));
+                    loginSession.write(wrap(tmp, Target.LS, 0x00));//0x0200
                     break;
                 case 0x010a:
+                    int sessionID = tmp.getInt();
+                    int id = tmp.getInt();
+                    
+                    String name;
                     break;
                 case 0x010c:
+                    
                     break;
                 case 0x010e:
                     break;
@@ -172,26 +205,39 @@ public class GateServer implements Register, Decoder{
             }
         }
     }
-
+    
+    //GateServer and LoginServer
     private class LoginDecoder implements Decoder{
         public void decode(ByteBuffer buffer, AioSession session){
+            int sessionID;
             char form;
-            char checkCode;
             ByteBuffer tmp = Datagram.getDatagram(buffer);
             ByteBuffer nbuf = ByteBuffer.allocate(64);
             if(tmp == null)
                 return;
             form = Datagram.trim(tmp);
             switch(form){
-                case 0x0201:
+                case 0x0201://Successfully Login
                     break;
-                case 0x0203:
+                case 0x0203://return login info to Client
+                    sessionID = tmp.getInt();
+                    tmp.compact();
+                    sessions.get(sessionID).write(Datagram.wrap(tmp, Target.CT, 0x03));//0x0003
                     break;
-                case 0x0205:
+                case 0x0205://return register info to client
+                    sessionID = tmp.getInt();
+                    tmp.compact();
+                    sessions.get(sessionID).write(Datagram.wrap(tmp, Target.CT, 0x05));//0x0005
                     break;
                 case 0x0206:
+                    sessionID = tmp.getInt();
+                    tmp.compact();
+                    sessions.get(sessionID).write(Datagram.wrap(tmp, Target.CT, 0x06));//0x0006
                     break;
                 case 0x0209:
+                    sessionID = tmp.getInt();
+                    tmp.compact();
+                    sessions.get(sessionID).write(Datagram.wrap(tmp, Target.CT, 0x09));//0x0009
                     break;
             }
         }
