@@ -81,6 +81,7 @@ public class GateServer implements Register, Decoder{
     private String lIp;
     private int lPort;
     private int maxChar;
+    private Integer currChar = 0;
     public GateServer(){
         
     }
@@ -134,12 +135,21 @@ public class GateServer implements Register, Decoder{
                 session.write(Datagram.wrap(nbuf, Target.LS, 0x04));//0x0204
                 break;
             case 0x0007://res of character chosen
-                nbuf.put((byte)session.getAttachment());
-                nbuf.put(tmp);
-                nbuf.flip();
-                ByteBuffer tbuf = nbuf.duplicate();
-                session.write(Datagram.wrap(nbuf, Target.LS, 0x07));//0x0207
-                session.write(Datagram.wrap(tbuf, Target.GS, 0x09));//0x0109
+                synchronized(currChar){
+                    nbuf.put((byte)session.getAttachment());
+                    nbuf.put(tmp);
+                    nbuf.flip();
+                    ByteBuffer tbuf = ByteBuffer.allocate(64);
+                    if(currChar < maxChar){
+                        tbuf = nbuf.duplicate();
+                        currChar++;
+                        session.write(Datagram.wrap(tbuf, Target.GS, 0x09));//0x0109
+                    }
+                    else{//增加一个包，告诉client人数已达到上限0x0013
+                        session.write(Datagram.wrap(tbuf, Target.CT, 0x13));//0x0013
+                    }
+                    session.write(Datagram.wrap(nbuf, Target.LS, 0x07));//0x0207
+                }
                 break;
             case 0x0008:
                 nbuf.put((byte)session.getAttachment());
