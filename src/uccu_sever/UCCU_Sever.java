@@ -31,7 +31,6 @@ public class UCCU_Sever {
         }
         aio.init(ip, 8438, 4);
         //get ips and ports
-        
         Scanner in = new Scanner(System.in);
         System.out.println("Please type in GameServer's ip and port number");
         String gip = in.next();////////////////////////////////
