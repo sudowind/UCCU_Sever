@@ -136,7 +136,7 @@ public class GateServer implements Register, Decoder, Reaper{
     public void reap(AioSession session)
     {
         int sessionID;
-        System.out.println("Session " + session.getRemoteSocketAddress() + " has disconnected!");
+        System.out.println("Client " + session.getRemoteSocketAddress() + " has disconnected!");
         sessionID = (int)session.getAttachment();
         synchronized(sessions){
             sessions.remove(sessionID);
