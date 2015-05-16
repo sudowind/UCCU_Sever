@@ -24,7 +24,7 @@ public class UCCU_Sever {
     public static void main(String[] args) {
         // TODO code application logic here
         GateServer gate = new GateServer();
-        AioModule aio = new AioModule(gate, gate);
+        AioModule aio = new AioModule(gate, gate, gate);
         try {
             ip = InetAddress.getLocalHost().getHostAddress();
         } catch (Exception e) {
@@ -42,9 +42,6 @@ public class UCCU_Sever {
         System.out.println("GameServer is " + gip + ":" + gport);
         System.out.println("LoginServer is " + lip + ":" + lport);
         gate.init(gip, gport, lip, lport, aio);
-        
-        
-        
         aio.asyncAccept();
     }
     

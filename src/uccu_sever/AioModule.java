@@ -37,21 +37,36 @@ class SampleRegister implements Register {
     }
 }
 
+interface Reaper {
+    public void reap(AioSession session);
+}
+
+class SampleReaper {
+    public void reap(AioSession session)
+    {
+        System.out.println("Session " + session.getRemoteSocketAddress() + " has disconnected!");
+    }
+}
+
 public class AioModule {
     
     private AsynchronousServerSocketChannel asyncServerSocketChannel;
     private AsynchronousChannelGroup asyncChannelGroup;
+    
     private Register register;
     private Decoder decoder;
+    private Reaper reaper;
+    
     //private Future acceptFuture;
     private int threadPoolSize;
     private boolean started;
     private HashMap<SocketAddress, AioSession> sessionsMap;
-    public AioModule(Register reg, Decoder dec) {
+    public AioModule(Register reg, Decoder dec, Reaper rpr) {
         threadPoolSize = 0;
         started = false;
         register = reg;
         decoder = dec;
+        reaper = rpr;
         sessionsMap = new HashMap();
     }
     
@@ -73,14 +88,14 @@ public class AioModule {
             e.printStackTrace();
         }
     }
-    public AioSession connect(String hostName, int port, Decoder dec)
+    public AioSession connect(String hostName, int port, Decoder dec, Reaper rpr)
     {
         AioSession session = null;
         try {
             AsynchronousSocketChannel socketChannel = AsynchronousSocketChannel.open(asyncChannelGroup);
             Future done = socketChannel.connect(new InetSocketAddress(hostName, port));
             done.get();
-            session = new AioSession(socketChannel, dec, new ReadCompletionHandler(), new WriteCompletionHandler());
+            session = new AioSession(socketChannel, dec, rpr, new ReadCompletionHandler(), new WriteCompletionHandler());
             this.addSession(session);
         } catch (Exception e) {
             e.printStackTrace();
@@ -115,7 +130,7 @@ public class AioModule {
             try {
                 System.out.println("Accept from "+ socketChannel.getRemoteAddress());
                 socketChannel.setOption(StandardSocketOptions.TCP_NODELAY, true);
-                AioSession session = new AioSession(socketChannel, decoder, new ReadCompletionHandler(),
+                AioSession session = new AioSession(socketChannel, decoder, reaper, new ReadCompletionHandler(),
                                         new WriteCompletionHandler());
                 
                 if(!register.register(session, aio))// Session denied!
@@ -156,7 +171,7 @@ public class AioModule {
         {
             if(res < 0)
             {
-                System.out.println("Session " + session.getRemoteSocketAddress() + " has disconnected!");
+                session.reap();
                 session.close();
                 return;
             }

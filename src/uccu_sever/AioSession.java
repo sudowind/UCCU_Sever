@@ -37,17 +37,19 @@ public class AioSession {
     private Queue<ByteBuffer> writeQueue;
     private AsynchronousSocketChannel socketChannel;
     private Decoder decoder;
+    private Reaper reaper;
     private CompletionHandler<Integer, AioSession> readCompletionHandler;
     private CompletionHandler<Integer, AioSession> writeCompletionHandler;
     private Object attachment;
     
-    public AioSession(AsynchronousSocketChannel sockChannel, Decoder dec, CompletionHandler readHandler, 
+    public AioSession(AsynchronousSocketChannel sockChannel, Decoder dec, Reaper rpr, CompletionHandler readHandler, 
                         CompletionHandler writeHandler) {
         readBuffer = ByteBuffer.allocate(128);
         socketChannel = sockChannel;
         readCompletionHandler = readHandler;
         writeCompletionHandler = writeHandler;
         decoder = dec;
+        reaper = rpr;
         writeQueue = new LinkedList<ByteBuffer>();
     }
     public void setAttachment(Object att)
@@ -73,6 +75,10 @@ public class AioSession {
     public void decode()
     {
         this.decoder.decode(readBuffer, this);
+    }
+    public void reap()
+    {
+        this.reaper.reap(this);
     }
     public void asyncRead()
     {

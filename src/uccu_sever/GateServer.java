@@ -65,7 +65,7 @@ class PlayerInfo{
     }
 }
 
-public class GateServer implements Register, Decoder{
+public class GateServer implements Register, Decoder, Reaper{
     private AioModule localAio;
     private AioSession gameSession;
     private AioSession loginSession;
@@ -90,7 +90,7 @@ public class GateServer implements Register, Decoder{
         localAio = aio;
         lIp = lip;
         lPort = lport;
-        gameSession = aio.connect(gip, gport, new GameDecoder());
+        gameSession = aio.connect(gip, gport, new GameDecoder(), new SampleReaper());
         ByteBuffer msg = ByteBuffer.allocate(32);
         msg.putInt(12345);
         msg.flip();
@@ -104,6 +104,17 @@ public class GateServer implements Register, Decoder{
         aio.addSession(session);
         return true;
     }
+    
+    public void reap(AioSession session)
+    {
+        System.out.println("Session " + session.getRemoteSocketAddress() + " has disconnected!");
+    }
+    
+    private class SampleReaper implements Reaper{
+        public void reap(AioSession session){
+            System.out.println("Session " + session.getRemoteSocketAddress() + " has disconnected!");
+        }
+    } 
     
     //client and GateServer
     public void decode(ByteBuffer buffer, AioSession session){
@@ -198,7 +209,7 @@ public class GateServer implements Register, Decoder{
             form = Datagram.trim(tmp);
             switch(form){
                 case 0x0101://connect LoginServer
-                    loginSession = localAio.connect(lIp, lPort, new LoginDecoder());
+                    loginSession = localAio.connect(lIp, lPort, new LoginDecoder(), new SampleReaper());
                     maxChar = tmp.getInt(2);
                     tmp.limit(2);
                     loginSession.write(Datagram.wrap(tmp, Target.LS, 0x00));//0x0200
