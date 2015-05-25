@@ -103,6 +103,7 @@ public class GateServer implements Register, Decoder, Reaper{
     }
     
     public void init(String gip, int gport, String lip, int lport, AioModule aio){
+        UccuLogger.kernel("GateServer/Init", "Initialize GateServer......");
         localAio = aio;
         lIp = lip;
         lPort = lport;
@@ -115,14 +116,14 @@ public class GateServer implements Register, Decoder, Reaper{
             gameSession.asyncRead();
             try{
                 lock0.wait();
-                System.out.println("successfully connect to GameServer");
+                UccuLogger.log("GateServer/Init", "successfully connect to GameServer at " + gip + ":" + gport);
             }catch(Exception e){
             }
         }
     }
     
     public boolean register(AioSession session, AioModule aio){
-        System.out.println("client connected!");
+        UccuLogger.log("GateServer/Init", "client at " + session.getRemoteSocketAddress() + "connected!");
         synchronized(sessions){
             sessions.put(clientNum, session);
             stats.put(clientNum, (byte)0);
@@ -136,7 +137,7 @@ public class GateServer implements Register, Decoder, Reaper{
     public void reap(AioSession session)
     {
         int sessionID;
-        System.out.println("Client " + session.getRemoteSocketAddress() + " has disconnected!");
+        UccuLogger.log("GateServer/Reap", "Client at " + session.getRemoteSocketAddress() + " has disconnected!");
         sessionID = (int)session.getAttachment();
         synchronized(sessions){
             sessions.remove(sessionID);
@@ -151,7 +152,7 @@ public class GateServer implements Register, Decoder, Reaper{
     
     private class SampleReaper implements Reaper{
         public void reap(AioSession session){
-            System.out.println("Session " + session.getRemoteSocketAddress() + " has disconnected!");
+            UccuLogger.log("GateServer/Reap", "Client at " + session.getRemoteSocketAddress() + " has disconnected!");
         }
     } 
     
@@ -175,12 +176,24 @@ public class GateServer implements Register, Decoder, Reaper{
                 session.close();
                 buffer.clear();
             }
+            else if(buffer.get() != 0xff){
+                synchronized(sessions){
+                    sessions.remove(session.getAttachment());
+                }
+                synchronized(players){
+                    if(players.containsKey(session.getAttachment())){
+                        players.remove(session.getAttachment());
+                    }
+                }
+                session.close();
+                buffer.clear();
+            }
             return;
         }
         form = Datagram.trim(tmp);
         switch(form){
             case 0x0000://first attach
-                System.out.println("client " + session.getRemoteSocketAddress() + " has connected.");
+                UccuLogger.log("GateServer/Decode", "Client at " + session.getRemoteSocketAddress() + " has connected!");
                 if(1.125 * currChar < maxChar){
                     nbuf.put((byte)1);
                 }
@@ -191,14 +204,14 @@ public class GateServer implements Register, Decoder, Reaper{
                 session.write(Datagram.wrap(nbuf, Target.CT, 0x01));//0x0001
                 break;
             case 0x0002://login info
-                System.out.println("client " + session.getRemoteSocketAddress() + " send name and pwd.");
+                UccuLogger.log("GateServer/Decode", "Client at " + session.getRemoteSocketAddress() + " send name and pwd.");
                 nbuf.putInt(id);
                 nbuf.put(tmp);
                 nbuf.flip();
                 loginSession.write(Datagram.wrap(nbuf, Target.LS, 0x02));//0x0202
                 break;
             case 0x0004://register new player
-                System.out.println("client " + session.getRemoteSocketAddress() + " register a new name.");
+                UccuLogger.log("GateServer/Decode", "Client at " + session.getRemoteSocketAddress() + " register a new name.");
                 nbuf.putInt(id);
                 nbuf.put(tmp);
                 nbuf.flip();
@@ -212,7 +225,7 @@ public class GateServer implements Register, Decoder, Reaper{
                     session.close();
                     break;
                 }
-                System.out.println("client " + session.getRemoteSocketAddress() + " has chosen his character.");
+                UccuLogger.log("GateServer/Decode", "Client at " + session.getRemoteSocketAddress() + " has chosen his character.");
                 synchronized(currChar){
                     nbuf.putInt(id);
                     nbuf.put(tmp);
@@ -236,7 +249,7 @@ public class GateServer implements Register, Decoder, Reaper{
                     session.close();
                     break;
                 }
-                System.out.println("client " + session.getRemoteSocketAddress() + " creat a new character.");
+                UccuLogger.log("GateServer/Decode", "Client at " + session.getRemoteSocketAddress() + " creat a new character.");
                 nbuf.putInt(id);
                 nbuf.put(tmp);
                 nbuf.flip();
@@ -250,7 +263,7 @@ public class GateServer implements Register, Decoder, Reaper{
                     session.close();
                     break;
                 }
-                System.out.println("client " + session.getRemoteSocketAddress() + " try to move.");
+                UccuLogger.log("GateServer/Decode", "Client at " + session.getRemoteSocketAddress() + " try to move.");
                 nbuf.putInt(id);
                 nbuf.put(tmp);
                 nbuf.flip();
@@ -264,7 +277,7 @@ public class GateServer implements Register, Decoder, Reaper{
                     session.close();
                     break;
                 }
-                System.out.println("client " + session.getRemoteSocketAddress() + " try to send globle msg.");
+                UccuLogger.log("GateServer/Decode", "Client at " + session.getRemoteSocketAddress() + " try to send global msg.");
                 nbuf.putInt(id);
                 nbuf.put(tmp);
                 nbuf.flip();
@@ -278,7 +291,7 @@ public class GateServer implements Register, Decoder, Reaper{
                     session.close();
                     break;
                 }
-                System.out.println("client " + session.getRemoteSocketAddress() + " try to start a private chat.");
+                UccuLogger.log("GateServer/Decode", "Client at " + session.getRemoteSocketAddress() + " try to start a private chat.");
                 nbuf.putInt(id);
                 nbuf.put(tmp);
                 nbuf.flip();
@@ -315,13 +328,12 @@ public class GateServer implements Register, Decoder, Reaper{
                         loginSession.asyncRead();
                         try{
                             lock1.wait();
-                            System.out.println("successfully connect to LoginServer");
+                            UccuLogger.log("GateServer/Init", "successfully connect to LoginServer at " + loginSession.getRemoteSocketAddress());
                         }catch(Exception e){
 
                         }
                     }
                     localAio.asyncAccept();
-                    System.out.println("aio response!");
                     synchronized(lock0){
                         lock0.notify();
                     }
@@ -345,7 +357,7 @@ public class GateServer implements Register, Decoder, Reaper{
                         players.put(sessionID, new PlayerInfo(id, name, level, 
                                 gender, posX, posY, sessionID));
                         currChar = players.size();
-                        System.out.println("new character comes in!");
+                        UccuLogger.log("GateServer/Decode", "new character comes in.");
                         players.get(sessionID).printInfo();
                     }
                     break;
@@ -365,13 +377,15 @@ public class GateServer implements Register, Decoder, Reaper{
                                     Datagram.wrap(nbuf, Target.CT, 0x0c));//0x000c
                         }
                     }
+                    UccuLogger.log("GateServer/Decode", "GameServer allows this movement.");
                     break;
                 case 0x010e://Globel msg rejected
                     sessionID = tmp.getInt();
                     tmp.compact();
                     sessions.get(sessionID).write(Datagram.wrap(tmp, Target.CT, 0x0e));//0x000e
+                    UccuLogger.log("GateServer/Decode", "GameServer reject this global msg.");
                     break;
-                case 0x010f://send globel msg to every player
+                case 0x010f://send global msg to every player
                     sessionID = tmp.getInt();
                     tmp.compact();
                     synchronized(players){
@@ -380,11 +394,13 @@ public class GateServer implements Register, Decoder, Reaper{
                                     Datagram.wrap(tmp, Target.CT, 0x0f));//0x000f
                         }
                     }
+                    UccuLogger.log("GateServer/Decode", "GameServer allows this global msg.");
                     break;
                 case 0x0111://Private chat rejected
                     sessionID = tmp.getInt();
                     tmp.compact();
                     sessions.get(sessionID).write(Datagram.wrap(tmp, Target.CT, 0x11));//0x0011
+                    UccuLogger.log("GateServer/Decode", "GameServer rejects this private chat.");
                     break;
                 case 0x0112://Private chat
                     sessionID = tmp.getInt();
@@ -401,6 +417,7 @@ public class GateServer implements Register, Decoder, Reaper{
                             }
                         }
                     }
+                    UccuLogger.log("GateServer/Decode", "GameServer allows this private chat.");
                     break;
             }
         }
@@ -421,7 +438,6 @@ public class GateServer implements Register, Decoder, Reaper{
                 case 0x0201://Successfully Login
                     synchronized(lock1){
                         lock1.notify();
-                        System.out.println("login response!");
                     }
                     break;
                 case 0x0203://return login info to Client
@@ -430,32 +446,30 @@ public class GateServer implements Register, Decoder, Reaper{
                     res = tmp.get(0);
                     if(res == 1){
                         stats.put(sessionID, (byte)1);
-                        System.out.println("Client " + sessions.get(sessionID).
-                                getRemoteSocketAddress() + " login successfully!");
+                        UccuLogger.log("GateServer/Decode", "Client " + sessions.get(sessionID).getRemoteSocketAddress() + " login successfully!");
                     }
                     else{
-                        System.out.println("Client " + sessions.get(sessionID).
-                                getRemoteSocketAddress() + " login failed!");
+                        UccuLogger.log("GateServer/Decode", "Client " + sessions.get(sessionID).getRemoteSocketAddress() + " login failed!");
                     }
                     sessions.get(sessionID).write(Datagram.wrap(tmp, Target.CT, 0x03));//0x0003
                     break;
                 case 0x0205://return register info to client
-                    System.out.println("LoginServer returns register result");
-                    sessionID = tmp.getInt();
+                    sessionID = tmp.get();
                     tmp.compact();
                     sessions.get(sessionID).write(Datagram.wrap(tmp, Target.CT, 0x05));//0x0005
+                    UccuLogger.log("GateServer/Decode", "LoginServer returns register result.");
                     break;
                 case 0x0206:
-                    System.out.println("LoginServer returns pre-load result");
                     sessionID = tmp.getInt();
                     tmp.compact();
                     sessions.get(sessionID).write(Datagram.wrap(tmp, Target.CT, 0x06));//0x0006
+                    UccuLogger.log("GateServer/Decode", "LoginServer returns pre-load result.");
                     break;
                 case 0x0209:
-                    System.out.println("LoginServer returns char-creation result");
                     sessionID = tmp.getInt();
                     tmp.compact();
                     sessions.get(sessionID).write(Datagram.wrap(tmp, Target.CT, 0x09));//0x0009
+                    UccuLogger.log("GateServer/Decode", "LoginServer returns char-creation result.");
                     break;
             }
         }

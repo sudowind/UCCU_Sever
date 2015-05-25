@@ -108,6 +108,7 @@ public class AioSession {
     }
     public void close()
     {
+        this.reap();
         try {
             socketChannel.close();
         } catch (Exception e) {
